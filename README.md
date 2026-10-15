@@ -12,7 +12,9 @@ For reference, an example Amplify Fusion API Pagination where the backend is a D
 
 ## Getting Started
 
-TO get started, import the Amplify Fusion project export file, [APIPaginationExample.zip](APIPaginationExample.zip) into your Fusion tenant from the Fusion Manager module.
+To get started, import the Amplify Fusion project export file, [APIPaginationExample.zip](APIPaginationExample.zip) into your Fusion tenant from the Fusion Manager module.
+
+Then, go to the project, APIPaginationExample, in the Designer module.
 
 ## Details
 
