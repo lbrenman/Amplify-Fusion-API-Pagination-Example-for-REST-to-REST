@@ -1,0 +1,244 @@
+openapi: 3.0.1
+info:
+  title: Employee Directory Facade API
+  version: 1.0.0
+  description: |
+    Front-end facade over the API Test Tool's employee data API. It exposes
+    page/size pagination and a simplified, renamed employee shape.
+
+    Backend call: GET {dataApi}/v1/p/offset/employees?offset=&limit=
+
+    Pagination mapping
+    | Facade (request/response)  | Data API                               |
+    |----------------------------|----------------------------------------|
+    | page, size                 | offset = (page - 1) * size, limit = size |
+    | pagination.page / .size    | echoed from the request                |
+    | pagination.totalItems      | meta.total                             |
+    | pagination.totalPages      | ceil(meta.total / limit)               |
+    | employees[]                | data[]                                 |
+
+    Field mapping (per employee)
+    | Facade field       | Data API field                         | Mapping        |
+    |--------------------|----------------------------------------|----------------|
+    | employeeId         | id                                     | rename         |
+    | employeeCode       | employeeNumber                         | rename         |
+    | fullName           | firstName + " " + lastName             | concatenate    |
+    | workEmail          | email                                  | rename         |
+    | jobTitle           | title                                  | rename         |
+    | grade              | level                                  | rename         |
+    | status             | isActive (true/false)                  | ACTIVE / INACTIVE |
+    | departmentName     | department.name                        | flatten        |
+    | managerEmployeeId  | managerId                              | rename (nullable) |
+    | startDate          | hireDate                               | rename         |
+    | location.city      | address.city                           | restructure    |
+    | location.country   | address.countryCode                    | restructure    |
+    | lastModified       | updatedAt                              | rename         |
+
+    Fields not exposed by the facade (dropped): uuid, salary, salaryDecimal,
+    performanceRating, skills, certifications, phoneNumbers, metadata,
+    avatarFileId, createdAt, and the rest of address.
+servers:
+  - url: https://facade.example.com/hr/v1
+    description: Placeholder facade endpoint
+tags:
+  - name: Employees
+    description: Employee directory
+paths:
+  /employees:
+    get:
+      tags: [Employees]
+      operationId: listEmployees
+      summary: List employees (page/size pagination)
+      parameters:
+        - name: page
+          in: query
+          description: Page number, starting at 1.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 2
+        - name: size
+          in: query
+          description: Number of employees per page.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 3
+      responses:
+        '200':
+          description: A page of employees.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeePage'
+              example:
+                employees:
+                  - employeeId: 4
+                    employeeCode: EMP-000004
+                    fullName: Maria Gonzalez
+                    workEmail: maria.gonzalez@example.com
+                    jobTitle: Senior Software Engineer
+                    grade: L5
+                    status: ACTIVE
+                    departmentName: Engineering
+                    managerEmployeeId: 1
+                    startDate: '2019-03-11'
+                    location:
+                      city: Austin
+                      country: US
+                    lastModified: '2026-09-30T14:05:12Z'
+                  - employeeId: 5
+                    employeeCode: EMP-000005
+                    fullName: Daniel Okafor
+                    workEmail: daniel.okafor@example.com
+                    jobTitle: Account Executive
+                    grade: L3
+                    status: INACTIVE
+                    departmentName: Sales
+                    managerEmployeeId: null
+                    startDate: '2021-07-19'
+                    location:
+                      city: Chicago
+                      country: US
+                    lastModified: '2026-08-14T09:41:55Z'
+                  - employeeId: 6
+                    employeeCode: EMP-000006
+                    fullName: Aiko Tanaka
+                    workEmail: aiko.tanaka@example.com
+                    jobTitle: HR Business Partner
+                    grade: L4
+                    status: ACTIVE
+                    departmentName: Human Resources
+                    managerEmployeeId: 2
+                    startDate: '2020-01-06'
+                    location:
+                      city: Toronto
+                      country: CA
+                    lastModified: '2026-10-02T17:22:03Z'
+                pagination:
+                  page: 2
+                  size: 3
+                  totalItems: 250
+                  totalPages: 84
+        '400':
+          description: Invalid page or size.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: INVALID_PARAMETER
+                message: size must be between 1 and 100.
+        '500':
+          description: Unexpected error or the data API is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: UPSTREAM_ERROR
+                message: The employee data service is unavailable.
+components:
+  schemas:
+    Employee:
+      type: object
+      required:
+        - employeeId
+        - employeeCode
+        - fullName
+        - workEmail
+        - status
+      properties:
+        employeeId:
+          type: integer
+          description: Mapped from id.
+        employeeCode:
+          type: string
+          description: Mapped from employeeNumber.
+          pattern: '^EMP-[0-9]{6}$'
+        fullName:
+          type: string
+          description: firstName and lastName joined with a space.
+        workEmail:
+          type: string
+          format: email
+          description: Mapped from email.
+        jobTitle:
+          type: string
+          description: Mapped from title.
+        grade:
+          type: string
+          enum: [L1, L2, L3, L4, L5, L6, L7]
+          description: Mapped from level.
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          description: ACTIVE when isActive is true, otherwise INACTIVE.
+        departmentName:
+          type: string
+          description: Mapped from department.name.
+        managerEmployeeId:
+          type: integer
+          nullable: true
+          description: Mapped from managerId; null for top-level employees.
+        startDate:
+          type: string
+          format: date
+          description: Mapped from hireDate.
+        location:
+          $ref: '#/components/schemas/Location'
+        lastModified:
+          type: string
+          format: date-time
+          description: Mapped from updatedAt.
+    Location:
+      type: object
+      properties:
+        city:
+          type: string
+          description: Mapped from address.city.
+        country:
+          type: string
+          description: Mapped from address.countryCode (ISO 3166-1 alpha-2).
+          pattern: '^[A-Z]{2}$'
+    Pagination:
+      type: object
+      required: [page, size, totalItems, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        size:
+          type: integer
+          minimum: 1
+        totalItems:
+          type: integer
+          minimum: 0
+          description: Mapped from meta.total.
+        totalPages:
+          type: integer
+          minimum: 0
+          description: ceil(totalItems / size).
+    EmployeePage:
+      type: object
+      required: [employees, pagination]
+      properties:
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
